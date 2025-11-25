@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Solar Tracker Dashboard</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #121212;
+            --card-bg: #1e1e1e;
+            --primary: #00e5ff; /* Cyan Neon */
+            --accent: #ff4081;  /* Pink Neon */
+            --text: #ffffff;
+            --panel-color: #1565c0;
+            --panel-grid: #bbdefb;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text);
+            font-family: 'Segoe UI', Roboto, Helvetica, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 { margin-bottom: 10px; font-size: 1.5rem; text-align: center; }
+        .status-text { font-size: 0.9rem; color: #aaa; margin-bottom: 20px; }
+
+        /* --- CONTAINER UTAMA --- */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            width: 100%;
+            max-width: 1000px;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+            border: 1px solid #333;
+        }
+
+        .card h2 { margin-top: 0; font-size: 1.2rem; border-bottom: 1px solid #444; padding-bottom: 10px; color: var(--primary); }
+
+        /* --- 1. VISUALISASI 3D PANEL --- */
+        .scene {
+            width: 100%;
+            height: 200px;
+            perspective: 600px; /* Memberi efek kedalaman 3D */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        .base {
+            width: 10px; height: 50px; background: #555;
+            transform: translateY(60px);
+            position: absolute; z-index: 0;
+        }
+
+        .solar-panel {
+            width: 160px;
+            height: 100px;
+            background: linear-gradient(135deg, var(--panel-color) 0%, #0d47a1 100%);
+            border: 4px solid #eee;
+            position: relative;
+            transition: transform 0.5s cubic-bezier(0.4, 0.0, 0.2, 1); /* Gerakan Halus */
+            transform-style: preserve-3d;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            /* Grid Lines Panel */
+            background-image: 
+                linear-gradient(var(--panel-grid) 1px, transparent 1px),
+                linear-gradient(90deg, var(--panel-grid) 1px, transparent 1px);
+            background-size: 38px 32px;
+            z-index: 1;
+        }
+
+        .axis-label {
+            text-align: center; margin-top: 10px; font-size: 0.9rem; color: #ccc;
+        }
+
+        /* --- 2. DATA MONITORING (BARS) --- */
+        .data-row { display: flex; justify-content: space-between; margin-bottom: 10px; align-items: center; }
+        .val { font-weight: bold; font-size: 1.2rem; color: var(--primary); }
+        
+        .bar-container { width: 100%; height: 8px; background: #333; border-radius: 4px; overflow: hidden; margin-bottom: 15px; }
+        .bar-fill { height: 100%; background: var(--primary); width: 0%; transition: width 0.5s; }
+        .bar-fill.pwr { background: var(--accent); }
+
+        /* --- 3. KONTROL MODE (TOMBOL) --- */
+        .mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .btn-mode {
+            padding: 15px;
+            border: 2px solid #444;
+            background: transparent;
+            color: #888;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        .btn-mode:hover { border-color: var(--primary); color: #fff; }
+        
+        /* Class Active (Dipilih via JS) */
+        .btn-mode.active {
+            background-color: var(--primary);
+            border-color: var(--primary);
+            color: #000;
+            box-shadow: 0 0 15px var(--primary);
+        }
+
+        /* --- 4. MANUAL D-PAD --- */
+        .dpad {
+            display: grid;
+            grid-template-areas: 
+                ". up ."
+                "left . right"
+                ". down .";
+            gap: 10px;
+            justify-content: center;
+            margin-top: 10px;
+        }
+        .btn-move {
+            width: 60px; height: 60px;
+            background: #333; border: 2px solid #555; color: white;
+            border-radius: 50%;
+            font-size: 1.5rem; cursor: pointer;
+            display: flex; justify-content: center; align-items: center;
+            touch-action: manipulation; /* Mencegah zoom saat tap cepat di HP */
+            user-select: none;
+        }
+        .btn-move:active { background: var(--accent); border-color: var(--accent); transform: scale(0.95); }
+
+        /* Responsiveness untuk HP */
+        @media (max-width: 480px) {
+            .dashboard-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Solar Tracker Monitor</h1>
+    <div class="status-text">Terhubung ke: <span id="connect-status" style="color:red">Offline</span> | Update: <span id="last-time">--:--:--</span></div>
+
+    <div class="dashboard-grid">
+        
+        <div class="card">
+            <h2>Visualisasi Posisi</h2>
+            <div class="scene">
+                <div class="base"></div>
+                <div id="solar-panel-3d" class="solar-panel"></div>
+            </div>
+            <div class="axis-label">
+                Azimuth (Y): <span id="val-az">0</span>° | Elevasi (X): <span id="val-el">0</span>°
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Monitoring Daya</h2>
+            
+            <div class="data-row"><span>Daya (Watt)</span> <span id="val-watt" class="val">0.00 W</span></div>
+            <div class="bar-container"><div id="bar-watt" class="bar-fill pwr"></div></div>
+
+            <div class="data-row"><span>Tegangan</span> <span id="val-volt" class="val">0.00 V</span></div>
+            <div class="bar-container"><div id="bar-volt" class="bar-fill"></div></div>
+
+            <div class="data-row"><span>Arus</span> <span id="val-amp" class="val">0.00 A</span></div>
+        </div>
+
+        <div class="card">
+            <h2>Mode Operasi</h2>
+            <div class="mode-grid">
+                <button id="btn-mode-0" class="btn-mode" onclick="setMode(0)">AUTO (Hybrid)</button>
+                <button id="btn-mode-1" class="btn-mode" onclick="setMode(1)">MANUAL (Web)</button>
+                <button id="btn-mode-2" class="btn-mode" onclick="setMode(2)">LDR Only</button>
+                <button id="btn-mode-3" class="btn-mode" onclick="setMode(3)">GPS Only</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>Kontrol Manual</h2>
+            <div style="text-align:center; margin-bottom:10px; font-size:0.8rem; color:#777;">
+                *Aktifkan Mode MANUAL terlebih dahulu
+            </div>
+            <div class="dpad">
+                <div class="btn-move" style="grid-area: up" onmousedown="move('UP')" onmouseup="stop()" ontouchstart="move('UP')" ontouchend="stop()">▲</div>
+                <div class="btn-move" style="grid-area: left" onmousedown="move('LEFT')" onmouseup="stop()" ontouchstart="move('LEFT')" ontouchend="stop()">◀</div>
+                <div class="btn-move" style="grid-area: right" onmousedown="move('RIGHT')" onmouseup="stop()" ontouchstart="move('RIGHT')" ontouchend="stop()">▶</div>
+                <div class="btn-move" style="grid-area: down" onmousedown="move('DOWN')" onmouseup="stop()" ontouchstart="move('DOWN')" ontouchend="stop()">▼</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- KONFIGURASI FIREBASE (ISI DENGAN DATA ANDA!) ---
+        const firebaseConfig = {
+            apiKey: "API_KEY_ANDA_DARI_CONSOLE",
+            authDomain: "PROJECT_ID.firebaseapp.com",
+            databaseURL: "https://PROJECT_ID-default-rtdb.firebaseio.com",
+            projectId: "PROJECT_ID",
+            storageBucket: "PROJECT_ID.appspot.com",
+            messagingSenderId: "...",
+            appId: "..."
+        };
+
+        // Inisialisasi Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        // --- VARIABEL REFERENSI ---
+        const refStatus = db.ref('status');
+        const refControl = db.ref('control');
+
+        // --- FUNGSI VISUALISASI 3D ---
+        function update3DPanel(az, el) {
+            const panel = document.getElementById('solar-panel-3d');
+            // Logika CSS Transform:
+            // rotateZ = Azimuth (Putar kiri kanan)
+            // rotateX = Elevasi (Miring atas bawah) - Dikurangi agar panel "tidur" dan bangkit
+            // Kita batasi visual agar tidak terbalik aneh di layar
+            
+            // Penyesuaian visual (Tweak angka ini agar sesuai orientasi 3D yang enak dilihat)
+            // Anggap 0 derajat panel menghadap 'depan' layar
+            let cssAz = az; 
+            let cssEl = -el; // Minus agar miring ke belakang/depan sesuai perspektif
+
+            panel.style.transform = `rotateZ(${cssAz}deg) rotateX(${cssEl}deg)`;
+        }
+
+        // --- FUNGSI LISTENER DATA (REALTIME) ---
+        refStatus.on('value', (snapshot) => {
+            if(!snapshot.exists()) return;
+            const data = snapshot.val();
+
+            document.getElementById('connect-status').innerText = "Online";
+            document.getElementById('connect-status').style.color = "#00e5ff";
+            document.getElementById('last-time').innerText = data.time || "--:--:--";
+
+            // Update Angka
+            document.getElementById('val-watt').innerText = data.power.toFixed(2) + " W";
+            document.getElementById('val-volt').innerText = data.voltage.toFixed(2) + " V";
+            document.getElementById('val-amp').innerText = data.current.toFixed(2) + " A";
+            document.getElementById('val-az').innerText = data.azimuth.toFixed(1);
+            document.getElementById('val-el').innerText = data.elevation.toFixed(1);
+
+            // Update Bar Grafik
+            // Asumsi Max Daya 50W dan Max Volt 24V (Sesuaikan angka pembagi)
+            let pwrPercent = (data.power / 50) * 100; 
+            let voltPercent = (data.voltage / 24) * 100;
+            document.getElementById('bar-watt').style.width = Math.min(pwrPercent, 100) + "%";
+            document.getElementById('bar-volt').style.width = Math.min(voltPercent, 100) + "%";
+
+            // Update Visual 3D
+            update3DPanel(data.azimuth, data.elevation);
+
+            // Update Tombol Mode Aktif
+            updateActiveButton(data.mode);
+        });
+
+        // --- FUNGSI UI INTERAKTIF ---
+        function updateActiveButton(activeMode) {
+            // Reset semua tombol
+            for (let i = 0; i <= 3; i++) {
+                document.getElementById(`btn-mode-${i}`).classList.remove('active');
+            }
+            // Highlight tombol yang aktif
+            const btn = document.getElementById(`btn-mode-${activeMode}`);
+            if(btn) btn.classList.add('active');
+        }
+
+        // --- FUNGSI PENGIRIM PERINTAH ---
+        function setMode(mode) {
+            console.log("Request Mode:", mode);
+            refControl.child('request_mode').set(mode);
+        }
+
+        function move(dir) {
+            // Get current mode first local check (optional visual feedback)
+            // Kirim perintah gerak
+            refControl.child('manual_cmd').set(dir);
+        }
+
+        function stop() {
+            refControl.child('manual_cmd').set("STOP");
+        }
+
+    </script>
+</body>
+</html>
