@@ -264,7 +264,29 @@
         const refStatus = db.ref('status');
         const refControl = db.ref('control');
 
-        // --- FUNGSI UPDATE UI ---
+        // --- FUNGSI JAM REAL-TIME WIB (BARU) ---
+        // Fungsi ini membuat jam berjalan sendiri tanpa menunggu data Firebase
+        function startWIBClock() {
+            setInterval(() => {
+                const now = new Date();
+                const options = { 
+                    timeZone: 'Asia/Jakarta', 
+                    hour12: false, 
+                    hour: '2-digit', 
+                    minute: '2-digit', 
+                    second: '2-digit' 
+                };
+                // Update tampilan jam utama
+                const timeString = now.toLocaleTimeString('id-ID', options);
+                const el = document.getElementById('val-time');
+                if(el) el.innerText = timeString + " WIB";
+            }, 1000); // Update setiap 1000ms (1 detik)
+        }
+        
+        // Jalankan jam segera saat web dibuka
+        startWIBClock();
+
+        // --- FUNGSI UPDATE UI DARI FIREBASE ---
         refStatus.on('value', (snapshot) => {
             if(!snapshot.exists()) return;
             const data = snapshot.val();
@@ -275,7 +297,9 @@
             statusEl.innerText = "ONLINE";
             statusEl.style.color = "#00e5ff";
             statusEl.classList.add("blink");
-            document.getElementById('last-sync').innerText = now.toLocaleTimeString();
+            
+            // Update Last Sync (Juga dipaksa ke WIB)
+            document.getElementById('last-sync').innerText = now.toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' });
 
             // 1. Update Nilai & Bar
             updateValue('val-watt', data.power.toFixed(2) + " W");
@@ -283,14 +307,13 @@
             updateValue('val-amp', data.current.toFixed(2) + " A");
             
             // Logika Bar:
-            // Power max 50W, Volt max 15V, Amp max 5A (Sesuaikan dengan spesifikasi panel)
             updateBar('bar-watt', data.power, 50);
             updateBar('bar-volt', data.voltage, 15);
-            updateBar('bar-amp', data.current, 5); // Max 5 Ampere
+            updateBar('bar-amp', data.current, 5); 
 
-            // 2. Update Lokasi & Waktu
-            updateValue('val-time', data.time || "--:--:--");
-            // Mengambil latitude/longitude dari firebase, jika tidak ada pakai default 0
+            // 2. Update Lokasi (Waktu dihapus dari sini agar tidak bentrok dengan jam real-time)
+            // updateValue('val-time', data.time || "--:--:--");  <-- BARIS INI DIHAPUS/DIKOMENTARI
+            
             updateValue('val-lat', data.latitude ? data.latitude.toFixed(6) : "-");
             updateValue('val-lon', data.longitude ? data.longitude.toFixed(6) : "-");
 
@@ -334,3 +357,4 @@
     </script>
 </body>
 </html>
+
