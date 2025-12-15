@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Solar Tracker Dashboard - Simulation</title>
+    <title>Realtime Solar Tracker Dashboard</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
@@ -11,9 +11,11 @@
         :root {
             --bg-color: #121212;
             --card-bg: #1e1e1e;
-            --primary: #00e5ff; /* Cyan Neon */
-            --accent: #ff4081;  /* Pink Neon */
-            --warn: #ffab00;    /* Orange Neon */
+            --primary: #00e5ff; /* Cyan */
+            --accent: #ff4081;  /* Pink */
+            --warn: #ffab00;    /* Orange */
+            --success: #00e676; /* Green */
+            --danger: #ff1744;  /* Red */
             --text: #ffffff;
             --panel-color: #1565c0;
             --panel-grid: #bbdefb;
@@ -23,162 +25,102 @@
             background-color: var(--bg-color);
             color: var(--text);
             font-family: 'Segoe UI', Roboto, Helvetica, sans-serif;
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+            margin: 0; padding: 20px;
+            display: flex; flex-direction: column; align-items: center;
         }
 
         h1 { margin-bottom: 5px; font-size: 1.5rem; text-align: center; color: var(--primary); text-transform: uppercase; letter-spacing: 2px; }
         .subtitle { font-size: 0.9rem; color: #888; margin-bottom: 25px; }
 
-        /* --- CONTAINER UTAMA --- */
         .dashboard-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 20px;
-            width: 100%;
-            max-width: 1000px;
+            gap: 20px; width: 100%; max-width: 1000px;
         }
 
         .card {
             background-color: var(--card-bg);
-            border-radius: 15px;
-            padding: 20px;
+            border-radius: 15px; padding: 20px;
             box-shadow: 0 8px 16px rgba(0,0,0,0.3);
             border: 1px solid #333;
-            transition: transform 0.2s;
         }
-        
-        .card:hover { transform: translateY(-2px); border-color: #555; }
 
-        .card h2 { margin-top: 0; font-size: 1.1rem; border-bottom: 1px solid #444; padding-bottom: 10px; color: #ddd; display: flex; justify-content: space-between; align-items: center; }
+        .card h2 { margin-top: 0; font-size: 1.1rem; border-bottom: 1px solid #444; padding-bottom: 10px; color: #ddd; }
 
-        /* --- 1. VISUALISASI 3D PANEL --- */
+        /* VISUALISASI 3D */
         .scene {
-            width: 100%;
-            height: 180px;
-            perspective: 600px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            overflow: hidden;
-            margin-bottom: 10px;
+            width: 100%; height: 180px; perspective: 600px;
+            display: flex; justify-content: center; align-items: center;
+            overflow: hidden; margin-bottom: 10px;
         }
-
-        .base {
-            width: 10px; height: 50px; background: #555;
-            transform: translateY(60px);
-            position: absolute; z-index: 0;
-        }
-
+        .base { width: 10px; height: 50px; background: #555; transform: translateY(60px); position: absolute; }
         .solar-panel {
-            width: 140px;
-            height: 90px;
+            width: 140px; height: 90px;
             background: linear-gradient(135deg, var(--panel-color) 0%, #0d47a1 100%);
-            border: 3px solid #eee;
-            position: relative;
+            border: 3px solid #eee; position: relative;
             transition: transform 0.5s cubic-bezier(0.4, 0.0, 0.2, 1);
             transform-style: preserve-3d;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            background-image: 
-                linear-gradient(var(--panel-grid) 1px, transparent 1px),
-                linear-gradient(90deg, var(--panel-grid) 1px, transparent 1px);
-            background-size: 34px 29px;
-            z-index: 1;
+            background-image: linear-gradient(var(--panel-grid) 1px, transparent 1px), linear-gradient(90deg, var(--panel-grid) 1px, transparent 1px);
+            background-size: 34px 29px; z-index: 1;
         }
 
-        /* Update Axis Info untuk menampung dV dan dH */
-        .axis-info {
-            display: grid; 
-            grid-template-columns: 1fr 1fr; 
-            gap: 5px;
-            background: #252525; padding: 8px; border-radius: 8px; font-size: 0.85rem;
-        }
-        .axis-item { text-align: center; }
+        .axis-info { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; background: #252525; padding: 8px; border-radius: 8px; font-size: 0.85rem; }
         .axis-item span { color: var(--primary); font-weight: bold; }
-        .sensor-val span { color: #aaa; } /* Warna beda untuk sensor dV/dH */
 
-        /* --- 2. DATA MONITORING (BARS) --- */
+        /* MONITORING BARS */
         .data-row { display: flex; justify-content: space-between; margin-bottom: 5px; align-items: center; font-size: 0.9rem; color: #ccc; }
         .val { font-weight: bold; font-size: 1.1rem; color: #fff; }
-        
         .bar-container { width: 100%; height: 6px; background: #333; border-radius: 4px; overflow: hidden; margin-bottom: 15px; }
         .bar-fill { height: 100%; width: 0%; transition: width 0.5s ease-out; }
-        
         .bar-fill.volt { background: var(--primary); box-shadow: 0 0 8px var(--primary); }
         .bar-fill.curr { background: var(--warn); box-shadow: 0 0 8px var(--warn); }
         .bar-fill.pwr  { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
 
-        /* --- 3. LOCATION & TIME --- */
-        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-        .info-box { background: #252525; padding: 10px; border-radius: 8px; text-align: center; }
-        .info-label { font-size: 0.8rem; color: #888; display: block; margin-bottom: 2px; }
-        .info-val { font-size: 1rem; font-weight: bold; color: #fff; }
-        .time-display { font-size: 1.5rem; text-align: center; font-weight: bold; color: var(--primary); padding: 10px 0; letter-spacing: 1px; }
+        /* TOMBOL UKUR */
+        .btn-measure {
+            width: 100%; padding: 12px; margin-bottom: 20px;
+            background: linear-gradient(45deg, #d500f9, #ff4081);
+            color: white; border: none; border-radius: 8px;
+            font-weight: bold; cursor: pointer; text-transform: uppercase; letter-spacing: 1px;
+            box-shadow: 0 4px 15px rgba(213, 0, 249, 0.4);
+            transition: transform 0.1s;
+        }
+        .btn-measure:active { transform: scale(0.98); }
 
-        /* --- 4. KONTROL MODE --- */
+        /* KONTROL MODE */
         .mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-        .btn-mode {
-            padding: 12px;
-            border: 1px solid #444;
-            background: #2a2a2a;
-            color: #888;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: 600;
-            transition: all 0.2s;
-        }
+        .btn-mode { padding: 12px; border: 1px solid #444; background: #2a2a2a; color: #888; border-radius: 6px; cursor: pointer; font-weight: 600; transition: all 0.2s; }
         .btn-mode:hover { background: #333; color: #fff; }
-        
-        .btn-mode.active {
-            background-color: var(--primary);
-            border-color: var(--primary);
-            color: #000;
-            box-shadow: 0 0 10px rgba(0, 229, 255, 0.4);
-        }
+        .btn-mode.active { background-color: var(--primary); border-color: var(--primary); color: #000; box-shadow: 0 0 10px rgba(0, 229, 255, 0.4); }
 
-        /* --- 5. MANUAL D-PAD --- */
-        .dpad {
-            display: grid;
-            grid-template-areas: 
-                ". up ."
-                "left . right"
-                ". down .";
-            gap: 8px;
-            justify-content: center;
-            margin-top: 10px;
-        }
-        .btn-move {
-            width: 50px; height: 50px;
-            background: #333; border: 1px solid #555; color: white;
-            border-radius: 12px;
-            font-size: 1.2rem; cursor: pointer;
-            display: flex; justify-content: center; align-items: center;
-            user-select: none;
-            transition: active 0.1s;
-        }
+        /* DPAD */
+        .dpad { display: grid; grid-template-areas: ". up ." "left . right" ". down ."; gap: 8px; justify-content: center; margin-top: 15px; }
+        .btn-move { width: 50px; height: 50px; background: #333; border: 1px solid #555; color: white; border-radius: 12px; display: flex; justify-content: center; align-items: center; cursor: pointer; user-select: none; }
         .btn-move:active { background: var(--primary); color: #000; transform: scale(0.95); }
 
-        .footer-status { margin-top: 30px; font-size: 0.8rem; color: #555; }
-        .blink { animation: blinker 1.5s linear infinite; }
-        @keyframes blinker { 50% { opacity: 0.5; } }
+        /* CONNECTION STATUS */
+        .status-badge { display: inline-block; padding: 5px 15px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; text-transform: uppercase; }
+        .status-online { background: rgba(0, 230, 118, 0.2); color: var(--success); border: 1px solid var(--success); box-shadow: 0 0 10px rgba(0, 230, 118, 0.4); }
+        .status-offline { background: rgba(255, 23, 68, 0.2); color: var(--danger); border: 1px solid var(--danger); animation: blink 1.5s infinite; }
+        @keyframes blink { 50% { opacity: 0.5; } }
 
-        @media (max-width: 480px) {
-            .dashboard-grid { grid-template-columns: 1fr; }
-        }
+        .footer-status { margin-top: 30px; font-size: 0.8rem; color: #555; text-align: center; }
     </style>
 </head>
 <body>
 
     <h1>Solar Tracker Monitor</h1>
-    <div class="subtitle">Sistem Pemantau Dual Axis Realtime</div>
+    <div class="subtitle">Realtime Dashboard</div>
+
+    <div style="margin-bottom: 20px;">
+        <span id="conn-badge" class="status-badge status-offline">OFFLINE</span>
+    </div>
 
     <div class="dashboard-grid">
         
         <div class="card">
-            <h2>Visualisasi Posisi</h2>
+            <h2>Posisi Panel</h2>
             <div class="scene">
                 <div class="base"></div>
                 <div id="solar-panel-3d" class="solar-panel"></div>
@@ -186,167 +128,187 @@
             <div class="axis-info">
                 <div class="axis-item">Azimuth: <span id="val-az">0</span>°</div>
                 <div class="axis-item">Elevasi: <span id="val-el">0</span>°</div>
-                <div class="axis-item sensor-val">dV: <span id="val-dv">0</span></div>
-                <div class="axis-item sensor-val">dH: <span id="val-dh">0</span></div>
+                <div class="axis-item" style="grid-column: span 2; text-align: center; margin-top:5px; color:#888;">
+                    Selisih Cahaya: H:<span id="val-dh" style="color:#fff">0</span> | V:<span id="val-dv" style="color:#fff">0</span>
+                </div>
             </div>
         </div>
 
         <div class="card">
-            <h2>Monitoring Daya</h2>
+            <h2>Data Elektrikal</h2>
             
-            <div class="data-row"><span>Daya Total</span> <span id="val-watt" class="val" style="color:var(--accent)">0.00 W</span></div>
+            <button class="btn-measure" onclick="triggerMeasure()">
+                ⚡ UKUR VOC & ISC (RELAY)
+            </button>
+
+            <div class="data-row"><span>Estimasi Daya</span> <span id="val-watt" class="val" style="color:var(--accent)">0.00 W</span></div>
             <div class="bar-container"><div id="bar-watt" class="bar-fill pwr"></div></div>
 
-            <div class="data-row"><span>Tegangan PV</span> <span id="val-volt" class="val" style="color:var(--primary)">0.00 V</span></div>
+            <div class="data-row"><span>Tegangan (Voc)</span> <span id="val-volt" class="val" style="color:var(--primary)">0.00 V</span></div>
             <div class="bar-container"><div id="bar-volt" class="bar-fill volt"></div></div>
 
-            <div class="data-row"><span>Arus PV</span> <span id="val-amp" class="val" style="color:var(--warn)">0.00 A</span></div>
+            <div class="data-row"><span>Arus (Isc)</span> <span id="val-amp" class="val" style="color:var(--warn)">0.00 A</span></div>
             <div class="bar-container"><div id="bar-amp" class="bar-fill curr"></div></div>
-        </div>
-
-        <div class="card">
-            <h2>Info Lokasi & Waktu</h2>
-            <div class="time-display" id="val-time">--:--:--</div>
-            <div class="info-grid">
-                <div class="info-box">
-                    <span class="info-label">LATITUDE</span>
-                    <span class="info-val" id="val-lat">--</span>
-                </div>
-                <div class="info-box">
-                    <span class="info-label">LONGITUDE</span>
-                    <span class="info-val" id="val-lon">--</span>
-                </div>
-            </div>
-            <div style="margin-top:15px; font-size:0.8rem; text-align:center; color:#666;">
-                Status Koneksi: <span id="connect-status" style="font-weight:bold; color:red">Offline</span>
-            </div>
         </div>
 
         <div class="card">
             <h2>Mode & Kontrol</h2>
             <div class="mode-grid">
-                <button id="btn-mode-0" class="btn-mode" onclick="setMode(0)">AUTO</button>
+                <button id="btn-mode-0" class="btn-mode" onclick="setMode(0)">AUTO TRK</button>
                 <button id="btn-mode-1" class="btn-mode" onclick="setMode(1)">MANUAL</button>
-                <button id="btn-mode-2" class="btn-mode" onclick="setMode(2)">LDR</button>
-                <button id="btn-mode-3" class="btn-mode" onclick="setMode(3)">GPS</button>
+                <button id="btn-mode-2" class="btn-mode" onclick="setMode(2)">LDR ONLY</button>
+                <button id="btn-mode-3" class="btn-mode" onclick="setMode(3)">GPS ONLY</button>
             </div>
             
             <div class="dpad">
-                <div class="btn-move" style="grid-area: up">▲</div>
-                <div class="btn-move" style="grid-area: left">◀</div>
-                <div class="btn-move" style="grid-area: right">▶</div>
-                <div class="btn-move" style="grid-area: down">▼</div>
+                <div class="btn-move" style="grid-area: up" onmousedown="sendManual('UP')" onmouseup="sendManual('STOP')" ontouchstart="sendManual('UP')" ontouchend="sendManual('STOP')">▲</div>
+                <div class="btn-move" style="grid-area: left" onmousedown="sendManual('LEFT')" onmouseup="sendManual('STOP')" ontouchstart="sendManual('LEFT')" ontouchend="sendManual('STOP')">◀</div>
+                <div class="btn-move" style="grid-area: right" onmousedown="sendManual('RIGHT')" onmouseup="sendManual('STOP')" ontouchstart="sendManual('RIGHT')" ontouchend="sendManual('STOP')">▶</div>
+                <div class="btn-move" style="grid-area: down" onmousedown="sendManual('DOWN')" onmouseup="sendManual('STOP')" ontouchstart="sendManual('DOWN')" ontouchend="sendManual('STOP')">▼</div>
             </div>
         </div>
     </div>
 
-    <div class="footer-status">Last Sync: <span id="last-sync">--</span> | ID: ESP32-S3-SIM</div>
+    <div class="footer-status">
+        Connected to: solartracker-skripsi<br>
+        <span id="last-update-time">Waiting for data...</span>
+    </div>
 
     <script>
-        // --- KONFIGURASI FIREBASE (Dibiarkan untuk struktur, tapi tidak dijalankan logicnya) ---
+        // --- 1. KONFIGURASI FIREBASE ---
         const firebaseConfig = {
             apiKey: "AIzaSyBxJE3YmCHn_tX9omW3_SUQswyV71XpbWs",
             authDomain: "solartracker-skripsi.firebaseapp.com",
+            databaseURL: "https://solartracker-skripsi-default-rtdb.asia-southeast1.firebasedatabase.app",
             projectId: "solartracker-skripsi",
         };
-        // firebase.initializeApp(firebaseConfig); // Dicomentari agar tidak error di mode offline/simulasi
 
-        // --- FUNGSI UNTUK MENAMPILKAN DATA STATIS ---
-        function loadStaticData() {
-            console.log("Memuat data statis simulasi...");
+        // Inisialisasi Firebase
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const db = firebase.database();
+
+        // --- 2. VARIABEL LOGIKA KONEKSI ---
+        let lastHeartbeat = 0;
+        const OFFLINE_TIMEOUT = 5000; // 5 Detik tidak ada data = Offline
+
+        // --- 3. FUNGSI UPDATE UI DARI DATA FIREBASE ---
+        function updateDashboard(data) {
+            // Update Waktu Terakhir Data Masuk
+            lastHeartbeat = Date.now();
+            updateConnectionStatus(true);
             
-            // 1. DATA YANG ANDA MINTA
-            const data = {
-                time: "16:15:52", // Waktu Statis
-                azimuth: 353,
-                elevation: -25,
-                dV: -31,
-                dH: -24,
-                voltage: 19.7,
-                current: 1.22,
-                // Data dummy pelengkap
-                lat: -6.175110, 
-                lon: 106.865036,
-                mode: 2 // Contoh: Mode LDR
-            };
+            // Format Waktu
+            const now = new Date();
+            document.getElementById('last-update-time').innerText = "Last Update: " + now.toLocaleTimeString();
 
-            // Hitung Power (Watt) = V * I
-            const power = data.voltage * data.current; 
+            if (!data) return;
 
-            // 2. Update Tampilan Waktu
-            document.getElementById('val-time').innerText = data.time + " WIB";
-            document.getElementById('last-sync').innerText = "Static Data Mode";
-
-            // Update Koneksi jadi 'SIMULASI'
-            const statusEl = document.getElementById('connect-status');
-            statusEl.innerText = "SIMULASI";
-            statusEl.style.color = "#ffab00"; // Kuning
-            statusEl.classList.remove("blink");
-
-            // 3. Update Visualisasi Posisi & Sensor
-            document.getElementById('val-az').innerText = data.azimuth;
-            document.getElementById('val-el').innerText = data.elevation;
-            // Update dV dan dH
-            document.getElementById('val-dv').innerText = data.dV;
-            document.getElementById('val-dh').innerText = data.dH;
+            // --- Ambil Data Sensor ---
+            const volt = data.voltage || 0;
+            const amp = data.current || 0;
+            const power = volt * amp;
+            const az = data.azimuth || 0;
+            const el = data.elevation || 0;
+            const mode = data.mode !== undefined ? data.mode : -1;
             
-            // Update Rotasi 3D CSS
-            update3DPanel(data.azimuth, data.elevation);
+            // Data tambahan LDR (jika ada dari ESP code B)
+            const dH = data.ldr_diff_h || 0;
+            const dV = data.ldr_diff_v || 0;
 
-            // 4. Update Listrik
-            updateValue('val-watt', power.toFixed(2) + " W");
-            updateValue('val-volt', data.voltage.toFixed(2) + " V");
-            updateValue('val-amp', data.current.toFixed(2) + " A");
+            // --- Update Angka di Layar ---
+            document.getElementById('val-volt').innerText = volt.toFixed(2) + " V";
+            document.getElementById('val-amp').innerText = amp.toFixed(2) + " A";
+            document.getElementById('val-watt').innerText = power.toFixed(2) + " W";
+            document.getElementById('val-az').innerText = az.toFixed(0);
+            document.getElementById('val-el').innerText = el.toFixed(0);
+            document.getElementById('val-dh').innerText = dH;
+            document.getElementById('val-dv').innerText = dV;
 
-            // Update Progress Bar (Asumsi Max Power 50W, Max Volt 24V, Max Amp 5A)
-            updateBar('bar-watt', power, 50);
-            updateBar('bar-volt', data.voltage, 24);
-            updateBar('bar-amp', data.current, 5);
+            // --- Update Progress Bar ---
+            // Asumsi Max: 25V, 5A, 100W (Sesuaikan dengan panel Anda)
+            setBarWidth('bar-volt', volt, 25);
+            setBarWidth('bar-amp', amp, 5);
+            setBarWidth('bar-watt', power, 100);
 
-            // 5. Update Lokasi
-            updateValue('val-lat', data.lat.toFixed(6));
-            updateValue('val-lon', data.lon.toFixed(6));
-
-            // 6. Update Tombol Mode
-            updateActiveButton(data.mode);
-        }
-
-        // --- HELPER FUNCTIONS ---
-        function updateValue(id, val) {
-            const el = document.getElementById(id);
-            if(el) el.innerText = val;
-        }
-
-        function updateBar(id, val, max) {
-            const percent = Math.min((val / max) * 100, 100);
-            document.getElementById(id).style.width = percent + "%";
-        }
-
-        function update3DPanel(az, el) {
+            // --- Update Visualisasi 3D ---
             const panel = document.getElementById('solar-panel-3d');
-            // Koreksi visual: CSS rotateX positif biasanya memutar ke belakang, negatif ke depan
-            // Kita gunakan data mentah untuk demo ini
-            let cssAz = az; 
-            let cssEl = -el; 
-            panel.style.transform = `rotateZ(${cssAz}deg) rotateX(${cssEl}deg)`;
+            // RotateX negative agar menunduk ke depan/belakang sesuai perspektif CSS
+            panel.style.transform = `rotateZ(${az}deg) rotateX(${-el}deg)`;
+
+            // --- Update Tombol Mode Aktif ---
+            updateActiveModeBtn(mode);
         }
 
-        function updateActiveButton(activeMode) {
+        // --- 4. LISTENER FIREBASE (REALTIME) ---
+        // Mendengarkan path '/status'
+        db.ref('/status').on('value', (snapshot) => {
+            const data = snapshot.val();
+            updateDashboard(data);
+        });
+
+        // --- 5. LOGIKA CHECK ONLINE/OFFLINE ---
+        function updateConnectionStatus(isOnline) {
+            const badge = document.getElementById('conn-badge');
+            if (isOnline) {
+                badge.innerText = "ONLINE";
+                badge.className = "status-badge status-online";
+            } else {
+                badge.innerText = "OFFLINE";
+                badge.className = "status-badge status-offline";
+            }
+        }
+
+        // Cek setiap 1 detik: Apakah data terakhir masuk > 5 detik yang lalu?
+        setInterval(() => {
+            if (Date.now() - lastHeartbeat > OFFLINE_TIMEOUT) {
+                updateConnectionStatus(false);
+            }
+        }, 1000);
+
+        // --- 6. FUNGSI KONTROL (KIRIM KE FIREBASE) ---
+        
+        // Pemicu Pengukuran (Trigger Relay)
+        function triggerMeasure() {
+            if (document.getElementById('conn-badge').innerText === "OFFLINE") {
+                alert("ESP32 sedang OFFLINE. Tidak bisa mengirim perintah.");
+                return;
+            }
+            db.ref('/control/measure_trigger').set(true)
+                .then(() => alert("Perintah Ukur Dikirim!"))
+                .catch((e) => alert("Error: " + e.message));
+        }
+
+        // Ganti Mode
+        function setMode(modeId) {
+            db.ref('/control/request_mode').set(modeId);
+            // Optimistic UI update (langsung ganti warna tombol biar responsif)
+            updateActiveModeBtn(modeId);
+        }
+
+        // Kirim Perintah Manual
+        function sendManual(cmd) {
+            db.ref('/control/manual_cmd').set(cmd);
+        }
+
+        // Helper: Update Lebar Bar
+        function setBarWidth(id, val, max) {
+            let pct = (val / max) * 100;
+            if (pct > 100) pct = 100;
+            document.getElementById(id).style.width = pct + "%";
+        }
+
+        // Helper: Update Warna Tombol Mode
+        function updateActiveModeBtn(activeMode) {
             for (let i = 0; i <= 3; i++) {
                 const btn = document.getElementById(`btn-mode-${i}`);
-                if(btn) btn.classList.remove('active');
+                if (btn) btn.classList.remove('active');
             }
-            const btn = document.getElementById(`btn-mode-${activeMode}`);
-            if(btn) btn.classList.add('active');
+            const activeBtn = document.getElementById(`btn-mode-${activeMode}`);
+            if (activeBtn) activeBtn.classList.add('active');
         }
-
-        // Tombol Mode hanya log ke console untuk versi statis ini
-        function setMode(mode) { console.log("Request Mode:", mode); updateActiveButton(mode); }
-
-        // --- JALANKAN SIMULASI SAAT LOAD ---
-        window.onload = loadStaticData;
 
     </script>
 </body>
 </html>
-
