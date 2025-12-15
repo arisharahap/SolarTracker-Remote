@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Solar Tracker Dashboard</title>
-    <!-- Firebase SDK -->
+    <title>Solar Tracker Dashboard - Simulation</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
@@ -12,9 +11,9 @@
         :root {
             --bg-color: #121212;
             --card-bg: #1e1e1e;
-            --primary: #00e5ff; /* Cyan Neon - Volt */
-            --accent: #ff4081;  /* Pink Neon - Power */
-            --warn: #ffab00;    /* Orange Neon - Current */
+            --primary: #00e5ff; /* Cyan Neon */
+            --accent: #ff4081;  /* Pink Neon */
+            --warn: #ffab00;    /* Orange Neon */
             --text: #ffffff;
             --panel-color: #1565c0;
             --panel-grid: #bbdefb;
@@ -55,7 +54,6 @@
         .card:hover { transform: translateY(-2px); border-color: #555; }
 
         .card h2 { margin-top: 0; font-size: 1.1rem; border-bottom: 1px solid #444; padding-bottom: 10px; color: #ddd; display: flex; justify-content: space-between; align-items: center; }
-        .card h2 i { color: var(--primary); }
 
         /* --- 1. VISUALISASI 3D PANEL --- */
         .scene {
@@ -84,7 +82,6 @@
             transition: transform 0.5s cubic-bezier(0.4, 0.0, 0.2, 1);
             transform-style: preserve-3d;
             box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-            /* Grid Lines Panel */
             background-image: 
                 linear-gradient(var(--panel-grid) 1px, transparent 1px),
                 linear-gradient(90deg, var(--panel-grid) 1px, transparent 1px);
@@ -92,10 +89,16 @@
             z-index: 1;
         }
 
+        /* Update Axis Info untuk menampung dV dan dH */
         .axis-info {
-            display: flex; justify-content: space-around; background: #252525; padding: 8px; border-radius: 8px; font-size: 0.9rem;
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 5px;
+            background: #252525; padding: 8px; border-radius: 8px; font-size: 0.85rem;
         }
+        .axis-item { text-align: center; }
         .axis-item span { color: var(--primary); font-weight: bold; }
+        .sensor-val span { color: #aaa; } /* Warna beda untuk sensor dV/dH */
 
         /* --- 2. DATA MONITORING (BARS) --- */
         .data-row { display: flex; justify-content: space-between; margin-bottom: 5px; align-items: center; font-size: 0.9rem; color: #ccc; }
@@ -104,7 +107,6 @@
         .bar-container { width: 100%; height: 6px; background: #333; border-radius: 4px; overflow: hidden; margin-bottom: 15px; }
         .bar-fill { height: 100%; width: 0%; transition: width 0.5s ease-out; }
         
-        /* Warna Bar Spesifik */
         .bar-fill.volt { background: var(--primary); box-shadow: 0 0 8px var(--primary); }
         .bar-fill.curr { background: var(--warn); box-shadow: 0 0 8px var(--warn); }
         .bar-fill.pwr  { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
@@ -159,7 +161,6 @@
         }
         .btn-move:active { background: var(--primary); color: #000; transform: scale(0.95); }
 
-        /* Footer Status */
         .footer-status { margin-top: 30px; font-size: 0.8rem; color: #555; }
         .blink { animation: blinker 1.5s linear infinite; }
         @keyframes blinker { 50% { opacity: 0.5; } }
@@ -176,7 +177,6 @@
 
     <div class="dashboard-grid">
         
-        <!-- CARD 1: VISUALISASI -->
         <div class="card">
             <h2>Visualisasi Posisi</h2>
             <div class="scene">
@@ -186,27 +186,24 @@
             <div class="axis-info">
                 <div class="axis-item">Azimuth: <span id="val-az">0</span>°</div>
                 <div class="axis-item">Elevasi: <span id="val-el">0</span>°</div>
+                <div class="axis-item sensor-val">dV: <span id="val-dv">0</span></div>
+                <div class="axis-item sensor-val">dH: <span id="val-dh">0</span></div>
             </div>
         </div>
 
-        <!-- CARD 2: MONITORING LISTRIK -->
         <div class="card">
             <h2>Monitoring Daya</h2>
             
-            <!-- Power (Watt) -->
             <div class="data-row"><span>Daya Total</span> <span id="val-watt" class="val" style="color:var(--accent)">0.00 W</span></div>
             <div class="bar-container"><div id="bar-watt" class="bar-fill pwr"></div></div>
 
-            <!-- Voltage (Volt) -->
             <div class="data-row"><span>Tegangan PV</span> <span id="val-volt" class="val" style="color:var(--primary)">0.00 V</span></div>
             <div class="bar-container"><div id="bar-volt" class="bar-fill volt"></div></div>
 
-            <!-- Current (Ampere) - NEW INDICATOR -->
             <div class="data-row"><span>Arus PV</span> <span id="val-amp" class="val" style="color:var(--warn)">0.00 A</span></div>
             <div class="bar-container"><div id="bar-amp" class="bar-fill curr"></div></div>
         </div>
 
-        <!-- CARD 3: LOKASI & WAKTU (NEW) -->
         <div class="card">
             <h2>Info Lokasi & Waktu</h2>
             <div class="time-display" id="val-time">--:--:--</div>
@@ -225,7 +222,6 @@
             </div>
         </div>
 
-        <!-- CARD 4: MODE OPERASI -->
         <div class="card">
             <h2>Mode & Kontrol</h2>
             <div class="mode-grid">
@@ -235,95 +231,87 @@
                 <button id="btn-mode-3" class="btn-mode" onclick="setMode(3)">GPS</button>
             </div>
             
-            <!-- Manual Controls -->
             <div class="dpad">
-                <div class="btn-move" style="grid-area: up" onmousedown="move('UP')" onmouseup="stop()" ontouchstart="move('UP')" ontouchend="stop()">▲</div>
-                <div class="btn-move" style="grid-area: left" onmousedown="move('LEFT')" onmouseup="stop()" ontouchstart="move('LEFT')" ontouchend="stop()">◀</div>
-                <div class="btn-move" style="grid-area: right" onmousedown="move('RIGHT')" onmouseup="stop()" ontouchstart="move('RIGHT')" ontouchend="stop()">▶</div>
-                <div class="btn-move" style="grid-area: down" onmousedown="move('DOWN')" onmouseup="stop()" ontouchstart="move('DOWN')" ontouchend="stop()">▼</div>
+                <div class="btn-move" style="grid-area: up">▲</div>
+                <div class="btn-move" style="grid-area: left">◀</div>
+                <div class="btn-move" style="grid-area: right">▶</div>
+                <div class="btn-move" style="grid-area: down">▼</div>
             </div>
         </div>
     </div>
 
-    <div class="footer-status">Last Sync: <span id="last-sync">Waiting...</span> | ID: ESP32-S3-SIM</div>
+    <div class="footer-status">Last Sync: <span id="last-sync">--</span> | ID: ESP32-S3-SIM</div>
 
     <script>
-        // --- KONFIGURASI FIREBASE ---
+        // --- KONFIGURASI FIREBASE (Dibiarkan untuk struktur, tapi tidak dijalankan logicnya) ---
         const firebaseConfig = {
             apiKey: "AIzaSyBxJE3YmCHn_tX9omW3_SUQswyV71XpbWs",
             authDomain: "solartracker-skripsi.firebaseapp.com",
-            databaseURL: "https://solartracker-skripsi-default-rtdb.asia-southeast1.firebasedatabase.app",
             projectId: "solartracker-skripsi",
-            storageBucket: "solartracker-skripsi.firebasestorage.app",
-            messagingSenderId: "853511125460",
-            appId: "1:853511125460:web:5a5bb2394af2d9c0b0be41"
         };
+        // firebase.initializeApp(firebaseConfig); // Dicomentari agar tidak error di mode offline/simulasi
 
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
-        const refStatus = db.ref('status');
-        const refControl = db.ref('control');
-
-        // --- FUNGSI JAM REAL-TIME WIB (BARU) ---
-        // Fungsi ini membuat jam berjalan sendiri tanpa menunggu data Firebase
-        function startWIBClock() {
-            setInterval(() => {
-                const now = new Date();
-                const options = { 
-                    timeZone: 'Asia/Jakarta', 
-                    hour12: false, 
-                    hour: '2-digit', 
-                    minute: '2-digit', 
-                    second: '2-digit' 
-                };
-                // Update tampilan jam utama
-                const timeString = now.toLocaleTimeString('id-ID', options);
-                const el = document.getElementById('val-time');
-                if(el) el.innerText = timeString + " WIB";
-            }, 1000); // Update setiap 1000ms (1 detik)
-        }
-        
-        // Jalankan jam segera saat web dibuka
-        startWIBClock();
-
-        // --- FUNGSI UPDATE UI DARI FIREBASE ---
-        refStatus.on('value', (snapshot) => {
-            if(!snapshot.exists()) return;
-            const data = snapshot.val();
-            const now = new Date();
-
-            // Status Online
-            const statusEl = document.getElementById('connect-status');
-            statusEl.innerText = "ONLINE";
-            statusEl.style.color = "#00e5ff";
-            statusEl.classList.add("blink");
+        // --- FUNGSI UNTUK MENAMPILKAN DATA STATIS ---
+        function loadStaticData() {
+            console.log("Memuat data statis simulasi...");
             
-            // Update Last Sync (Juga dipaksa ke WIB)
-            document.getElementById('last-sync').innerText = now.toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta' });
+            // 1. DATA YANG ANDA MINTA
+            const data = {
+                time: "16:15:52", // Waktu Statis
+                azimuth: 353,
+                elevation: -25,
+                dV: -31,
+                dH: -24,
+                voltage: 19.7,
+                current: 1.22,
+                // Data dummy pelengkap
+                lat: -6.175110, 
+                lon: 106.865036,
+                mode: 2 // Contoh: Mode LDR
+            };
 
-            // 1. Update Nilai & Bar
-            updateValue('val-watt', data.power.toFixed(2) + " W");
+            // Hitung Power (Watt) = V * I
+            const power = data.voltage * data.current; 
+
+            // 2. Update Tampilan Waktu
+            document.getElementById('val-time').innerText = data.time + " WIB";
+            document.getElementById('last-sync').innerText = "Static Data Mode";
+
+            // Update Koneksi jadi 'SIMULASI'
+            const statusEl = document.getElementById('connect-status');
+            statusEl.innerText = "SIMULASI";
+            statusEl.style.color = "#ffab00"; // Kuning
+            statusEl.classList.remove("blink");
+
+            // 3. Update Visualisasi Posisi & Sensor
+            document.getElementById('val-az').innerText = data.azimuth;
+            document.getElementById('val-el').innerText = data.elevation;
+            // Update dV dan dH
+            document.getElementById('val-dv').innerText = data.dV;
+            document.getElementById('val-dh').innerText = data.dH;
+            
+            // Update Rotasi 3D CSS
+            update3DPanel(data.azimuth, data.elevation);
+
+            // 4. Update Listrik
+            updateValue('val-watt', power.toFixed(2) + " W");
             updateValue('val-volt', data.voltage.toFixed(2) + " V");
             updateValue('val-amp', data.current.toFixed(2) + " A");
-            
-            // Logika Bar:
-            updateBar('bar-watt', data.power, 50);
-            updateBar('bar-volt', data.voltage, 15);
-            updateBar('bar-amp', data.current, 5); 
 
-            // 2. Update Lokasi (Waktu dihapus dari sini agar tidak bentrok dengan jam real-time)
-            // updateValue('val-time', data.time || "--:--:--");  <-- BARIS INI DIHAPUS/DIKOMENTARI
-            
-            updateValue('val-lat', data.latitude ? data.latitude.toFixed(6) : "-");
-            updateValue('val-lon', data.longitude ? data.longitude.toFixed(6) : "-");
+            // Update Progress Bar (Asumsi Max Power 50W, Max Volt 24V, Max Amp 5A)
+            updateBar('bar-watt', power, 50);
+            updateBar('bar-volt', data.voltage, 24);
+            updateBar('bar-amp', data.current, 5);
 
-            // 3. Update Visual & Mode
-            document.getElementById('val-az').innerText = data.azimuth.toFixed(1);
-            document.getElementById('val-el').innerText = data.elevation.toFixed(1);
-            update3DPanel(data.azimuth, data.elevation);
+            // 5. Update Lokasi
+            updateValue('val-lat', data.lat.toFixed(6));
+            updateValue('val-lon', data.lon.toFixed(6));
+
+            // 6. Update Tombol Mode
             updateActiveButton(data.mode);
-        });
+        }
 
+        // --- HELPER FUNCTIONS ---
         function updateValue(id, val) {
             const el = document.getElementById(id);
             if(el) el.innerText = val;
@@ -336,6 +324,8 @@
 
         function update3DPanel(az, el) {
             const panel = document.getElementById('solar-panel-3d');
+            // Koreksi visual: CSS rotateX positif biasanya memutar ke belakang, negatif ke depan
+            // Kita gunakan data mentah untuk demo ini
             let cssAz = az; 
             let cssEl = -el; 
             panel.style.transform = `rotateZ(${cssAz}deg) rotateX(${cssEl}deg)`;
@@ -343,18 +333,19 @@
 
         function updateActiveButton(activeMode) {
             for (let i = 0; i <= 3; i++) {
-                document.getElementById(`btn-mode-${i}`).classList.remove('active');
+                const btn = document.getElementById(`btn-mode-${i}`);
+                if(btn) btn.classList.remove('active');
             }
             const btn = document.getElementById(`btn-mode-${activeMode}`);
             if(btn) btn.classList.add('active');
         }
 
-        // --- CONTROLLER ---
-        function setMode(mode) { refControl.child('request_mode').set(mode); }
-        function move(dir) { refControl.child('manual_cmd').set(dir); }
-        function stop() { refControl.child('manual_cmd').set("STOP"); }
+        // Tombol Mode hanya log ke console untuk versi statis ini
+        function setMode(mode) { console.log("Request Mode:", mode); updateActiveButton(mode); }
+
+        // --- JALANKAN SIMULASI SAAT LOAD ---
+        window.onload = loadStaticData;
 
     </script>
 </body>
 </html>
-
