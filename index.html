@@ -216,7 +216,8 @@
         <div class="card">
             <h2>Live Simulation</h2>
             <div class="scene-container">
-                <div class="floor-grid"></div> <div class="tracker-assembly">
+                <div class="floor-grid"></div> 
+                <div class="tracker-assembly">
                     <div class="stand-pole"></div>
                     <div class="stand-base"></div>
 
@@ -281,7 +282,7 @@
 
             <div class="footer-status">
                 <div style="margin-top:30px; border-top:1px solid #334155; padding-top:10px;">
-                    Last Sync: <span id="last-update" style="color:#fff">Waiting...</span>
+                    Device Time (WIB): <span id="last-update" style="color:#fff; font-weight:bold">Waiting...</span>
                 </div>
             </div>
         </div>
@@ -299,28 +300,37 @@
         if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        // --- VARS ---
-        let lastHeartbeat = 0;
-        const OFFLINE_TIMEOUT = 15000;
+        // --- VARS UNTUK DETEKSI KONEKSI NTP ---
+        let lastTimeStr = "";       // Menyimpan waktu (string) terakhir dari ESP
+        let lastRecieveTime = Date.now(); // Waktu terakhir kita terima update valid
+        const OFFLINE_TIMEOUT = 10000;    // 10 Detik toleransi
 
         // --- REALTIME LISTENER ---
         db.ref('/status').on('value', (snapshot) => {
             const data = snapshot.val();
-            lastHeartbeat = Date.now();
-            updateStatus(true);
             
-            const now = new Date();
-            document.getElementById('last-update').innerText = now.toLocaleTimeString();
-
             if (data) {
+                // 1. CEK STATUS KONEKSI BERDASARKAN JAM (LAST_SEEN)
+                const deviceTime = data.last_seen || ""; // Format HH:MM:SS dari ESP32
+
+                // Jika jam berubah (detik berjalan), berarti sistem ONLINE
+                if (deviceTime !== lastTimeStr && deviceTime !== "") {
+                    lastTimeStr = deviceTime;
+                    lastRecieveTime = Date.now(); // Reset counter timeout
+                    updateStatus(true);
+                    
+                    // Update teks waktu di footer dengan WAKTU DARI ALAT (bukan browser)
+                    document.getElementById('last-update').innerText = deviceTime;
+                }
+
+                // 2. UPDATE VISUALISASI & DATA
                 const volt = data.voltage || 0;
                 const amp = data.current || 0;
                 const power = volt * amp;
-                // Ambil sudut (dikurangi 0 agar jadi number)
                 const az = (data.azimuth || 0) * 1;
                 const el = (data.elevation || 0) * 1;
 
-                // Update Teks
+                // Update Angka
                 document.getElementById('val-volt').innerText = volt.toFixed(2) + " V";
                 document.getElementById('val-amp').innerText = amp.toFixed(2) + " A";
                 document.getElementById('val-watt').innerText = power.toFixed(2) + " W";
@@ -329,25 +339,23 @@
                 document.getElementById('val-dh').innerText = data.ldr_diff_h || 0;
                 document.getElementById('val-dv').innerText = data.ldr_diff_v || 0;
 
-                // Update Bars (Max asumsi: 30V, 5A, 100W)
+                // Update Bars
                 setBar('bar-volt', volt, 30);
                 setBar('bar-amp', amp, 5);
                 setBar('bar-watt', power, 100);
 
                 // Update 3D Rotation
-                // PENTING: Kita memutar 'panel-pivot', BUKAN seluruh scene.
-                // Azimuth: Putar sumbu Z (jika dilihat dari atas) atau Y (jika scene standard). 
-                // Di CSS ini: Y adalah sumbu vertikal.
-                // Elevation: Putar sumbu X (angguk). Negatif X biasanya menunduk ke depan.
                 const pivot = document.getElementById('panel-pivot');
-                // Koreksi Rotasi agar sesuai pandangan mata
                 pivot.style.transform = `rotateY(${az}deg) rotateX(${-el}deg)`;
             }
         });
 
-        // --- OFFLINE CHECKER ---
+        // --- CHECKER OFFLINE ---
+        // Cek setiap 1 detik apakah jam berhenti berdetak
         setInterval(() => {
-            if (Date.now() - lastHeartbeat > OFFLINE_TIMEOUT) updateStatus(false);
+            if (Date.now() - lastRecieveTime > OFFLINE_TIMEOUT) {
+                updateStatus(false);
+            }
         }, 1000);
 
         function updateStatus(isOnline) {
@@ -386,4 +394,3 @@
     </script>
 </body>
 </html>
-
