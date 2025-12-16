@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Solar Tracker Interval</title>
+    <title>Solar Tracker Smart Schedule</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
@@ -15,6 +15,7 @@
             --primary: #38bdf8;
             --accent: #f472b6;
             --ldr-box: #334155;
+            --success: #34d399;
         }
 
         body {
@@ -42,7 +43,7 @@
 
         /* --- TIMER --- */
         .timer-display {
-            font-size: 3rem; font-weight: bold; text-align: center;
+            font-size: 2rem; font-weight: bold; text-align: center;
             color: var(--primary); margin: 20px 0;
             font-family: monospace;
         }
@@ -51,10 +52,7 @@
         /* --- LDR GRID --- */
         .ldr-grid {
             display: grid;
-            grid-template-areas: 
-                ". north ."
-                "west center east"
-                ". south .";
+            grid-template-areas: ". north ." "west center east" ". south .";
             gap: 10px; justify-content: center; margin-top: 20px;
         }
         .ldr-box {
@@ -66,76 +64,77 @@
         }
         .ldr-box span { font-weight: bold; font-size: 1.2rem; }
         .ldr-label { font-size: 0.7rem; color: #94a3b8; margin-bottom: 5px; }
-        
-        /* Highlight yang paling terang */
         .brightest { border-color: var(--warn); background: rgba(251, 191, 36, 0.1); box-shadow: 0 0 10px rgba(251, 191, 36, 0.2); }
 
-        /* --- BUTTON --- */
+        /* --- BUTTONS --- */
+        .btn-group { display: grid; gap: 10px; margin-top: 20px; }
+        
         .btn-measure {
             width: 100%; padding: 15px;
             background: linear-gradient(135deg, var(--primary), var(--accent));
             border: none; border-radius: 10px;
             color: white; font-weight: bold; cursor: pointer;
-            margin-top: 20px;
         }
-        .btn-measure:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        /* Tombol Test Gerak - Warna Hijau */
+        .btn-test {
+            width: 100%; padding: 12px;
+            background: linear-gradient(135deg, #10b981, #059669);
+            border: none; border-radius: 10px;
+            color: white; font-weight: bold; cursor: pointer;
+            border: 1px solid #34d399;
+        }
+        
+        .btn-measure:disabled, .btn-test:disabled { opacity: 0.5; cursor: not-allowed; }
 
         .val-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 1rem; }
+        .status-moving { color: var(--success); font-weight: bold; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
     </style>
 </head>
 <body>
 
-    <h1>SOLAR INTERVAL TRACKER</h1>
-    <div style="color:#64748b; margin-bottom:20px;">Tracking Every 10 Minutes (09:00 - 17:00)</div>
+    <h1>SMART SOLAR TRACKER</h1>
+    <div style="color:#64748b; margin-bottom:20px;">Sistem Interval 10 Menit (09:00 - 17:00)</div>
 
     <div class="dashboard-grid">
         
         <div class="card">
-            <h2>Next Movement</h2>
-            <div class="timer-label">Waktu menuju pergerakan (Sinkron NTP)</div>
-            <div id="countdown" class="timer-display">--:--</div>
+            <h2>Jadwal Pergerakan</h2>
+            <div class="timer-label">Status Sistem:</div>
+            
+            <div id="schedule-display" class="timer-display">--:--</div>
+            
             <div style="text-align:center;">
-                Status: <span id="status-text" style="font-weight:bold; color:var(--accent)">WAITING</span>
+                Kondisi: <span id="status-text" style="font-weight:bold; color:var(--accent)">WAITING</span>
+            </div>
+
+            <div class="btn-group">
+                <button id="btn-test" class="btn-test" onclick="triggerTestMove()">
+                    ▶ TES GERAK (SEKALI)
+                </button>
             </div>
         </div>
 
         <div class="card">
-            <h2>Light Sensors (LDR)</h2>
+            <h2>Sensor Cahaya (LDR)</h2>
             <div class="ldr-grid">
-                <div class="ldr-box" style="grid-area: north" id="box-n">
-                    <div class="ldr-label">NORTH</div> <span id="val-n">0</span>
-                </div>
-                <div class="ldr-box" style="grid-area: west" id="box-w">
-                    <div class="ldr-label">WEST</div> <span id="val-w">0</span>
-                </div>
+                <div class="ldr-box" style="grid-area: north" id="box-n"><div class="ldr-label">NORTH</div> <span id="val-n">0</span></div>
+                <div class="ldr-box" style="grid-area: west" id="box-w"><div class="ldr-label">WEST</div> <span id="val-w">0</span></div>
                 <div style="grid-area: center; display:flex; align-items:center; justify-content:center; color:#fbbf24; font-size:2rem;">☀</div>
-                
-                <div class="ldr-box" style="grid-area: east" id="box-e">
-                    <div class="ldr-label">EAST</div> <span id="val-e">0</span>
-                </div>
-                <div class="ldr-box" style="grid-area: south" id="box-s">
-                    <div class="ldr-label">SOUTH</div> <span id="val-s">0</span>
-                </div>
+                <div class="ldr-box" style="grid-area: east" id="box-e"><div class="ldr-label">EAST</div> <span id="val-e">0</span></div>
+                <div class="ldr-box" style="grid-area: south" id="box-s"><div class="ldr-label">SOUTH</div> <span id="val-s">0</span></div>
             </div>
         </div>
 
         <div class="card">
-            <h2>PV Output Data</h2>
-            <div class="val-row">
-                <span>Voltage (Voc)</span>
-                <span id="val-volt" style="color:var(--primary); font-weight:bold;">0.00 V</span>
-            </div>
-            <div class="val-row">
-                <span>Current (Isc)</span>
-                <span id="val-amp" style="color:var(--accent); font-weight:bold;">0.00 A</span>
-            </div>
-            <div class="val-row">
-                <span>Total Power</span>
-                <span id="val-watt" style="color:#fbbf24; font-weight:bold;">0.00 W</span>
-            </div>
+            <h2>Output Panel Surya</h2>
+            <div class="val-row"><span>Tegangan (Voc)</span> <span id="val-volt" style="color:var(--primary); font-weight:bold;">0.00 V</span></div>
+            <div class="val-row"><span>Arus (Isc)</span> <span id="val-amp" style="color:var(--accent); font-weight:bold;">0.00 A</span></div>
+            <div class="val-row"><span>Estimasi Daya</span> <span id="val-watt" style="color:#fbbf24; font-weight:bold;">0.00 W</span></div>
             
             <button id="btn-measure" class="btn-measure" onclick="triggerMeasure()">
-                ⚡ UKUR DATA SEKARANG
+                ⚡ UKUR DATA LISTRIK
             </button>
         </div>
 
@@ -153,90 +152,95 @@
 
         let nextMoveEpoch = 0;
 
-        // Listener Data
         db.ref('/status').on('value', (snapshot) => {
             const data = snapshot.val();
             if(data) {
-                // 1. Data LDR
-                const n = data.ldr_n || 0;
-                const s = data.ldr_s || 0;
-                const e = data.ldr_e || 0;
-                const w = data.ldr_w || 0;
-                
-                document.getElementById('val-n').innerText = n;
-                document.getElementById('val-s').innerText = s;
-                document.getElementById('val-e').innerText = e;
-                document.getElementById('val-w').innerText = w;
-
-                // Highlight LDR paling terang (nilai terkecil = terang, asumsi pull-up/down, sesuaikan)
-                // Jika pakai rangkaian pull-down (makin terang makin besar nilai):
+                // 1. Update LDR
+                const n = data.ldr_n || 0; const s = data.ldr_s || 0;
+                const e = data.ldr_e || 0; const w = data.ldr_w || 0;
+                document.getElementById('val-n').innerText = n; document.getElementById('val-s').innerText = s;
+                document.getElementById('val-e').innerText = e; document.getElementById('val-w').innerText = w;
                 highlightBrightest(n, s, e, w);
 
-                // 2. Data Listrik
+                // 2. Update Power
                 document.getElementById('val-volt').innerText = (data.voltage || 0).toFixed(2) + " V";
                 document.getElementById('val-amp').innerText = (data.current || 0).toFixed(2) + " A";
                 document.getElementById('val-watt').innerText = ((data.voltage||0)*(data.current||0)).toFixed(2) + " W";
 
-                // 3. Status Gerak
+                // 3. Update Status Gerak
                 const isMoving = data.is_moving || false;
                 const statEl = document.getElementById('status-text');
+                const schedEl = document.getElementById('schedule-display');
+                
                 if(isMoving) {
-                    statEl.innerText = "TRACKING NOW...";
-                    statEl.style.color = "#34d399"; // Hijau
+                    statEl.innerText = "SEDANG MENCARI POSISI...";
+                    statEl.className = "status-moving";
+                    schedEl.innerText = "MOVING NOW";
                 } else {
-                    statEl.innerText = "WAITING NEXT SCHEDULE";
-                    statEl.style.color = "#f472b6"; // Pink
+                    statEl.innerText = "STANDBY / DIAM";
+                    statEl.className = "";
+                    statEl.style.color = "#f472b6";
+                    
+                    // 4. Update Tampilan Jadwal Pintar
+                    nextMoveEpoch = data.next_move_epoch || 0;
+                    updateScheduleDisplay();
                 }
-
-                // 4. Ambil Jadwal Berikutnya (Epoch)
-                nextMoveEpoch = data.next_move_epoch || 0;
             }
         });
 
-        // --- COUNTDOWN LOGIC ---
-        setInterval(() => {
-            if(nextMoveEpoch > 0) {
-                // Waktu Sekarang (Browser/Device user) - pastikan device user jamnya benar
-                // Atau lebih baik pakai NTP tapi di JS agak ribet, pakai Date.now() / 1000 sudah cukup dekat
-                const nowEpoch = Math.floor(Date.now() / 1000);
-                let diff = nextMoveEpoch - nowEpoch;
-
-                if (diff < 0) diff = 0;
-
-                const m = Math.floor(diff / 60);
-                const s = diff % 60;
+        // --- FUNGSI UPDATE TAMPILAN JADWAL ---
+        function updateScheduleDisplay() {
+            if (nextMoveEpoch > 0) {
+                const targetDate = new Date(nextMoveEpoch * 1000);
+                const now = new Date();
                 
-                // Format MM:SS
-                document.getElementById('countdown').innerText = 
-                    `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-            }
-        }, 1000);
+                // Format Jam Target: HH:MM
+                const hours = targetDate.getHours().toString().padStart(2, '0');
+                const mins = targetDate.getMinutes().toString().padStart(2, '0');
+                const timeStr = `${hours}:${mins}`;
 
-        // Fungsi Highlight Box
+                // Cek apakah tanggal target sama dengan hari ini
+                const isToday = targetDate.getDate() === now.getDate() && 
+                                targetDate.getMonth() === now.getMonth();
+
+                const displayEl = document.getElementById('schedule-display');
+                
+                if (isToday) {
+                    displayEl.innerText = `Jadwal: ${timeStr} WIB`;
+                    displayEl.style.fontSize = "2rem";
+                } else {
+                    // Jika tanggal beda, berarti "Besok"
+                    displayEl.innerText = `BESOK PAGI ${timeStr}`;
+                    displayEl.style.fontSize = "1.8rem"; // Kecilkan dikit biar muat
+                }
+            }
+        }
+
+        // Jalankan update setiap detik agar tetap sinkron kalau pindah hari
+        setInterval(updateScheduleDisplay, 1000);
+
         function highlightBrightest(n, s, e, w) {
-            // Hapus kelas lama
             document.querySelectorAll('.ldr-box').forEach(b => b.classList.remove('brightest'));
-            
-            // Cari nilai terbesar (Asumsi: Makin terang = Nilai makin BESAR pada rangkaian divider umum)
-            // Jika rangkaian Anda terbalik (makin terang = makin kecil), ubah logic Math.max jadi Math.min
             const maxVal = Math.max(n, s, e, w);
-            
             if(n === maxVal) document.getElementById('box-n').classList.add('brightest');
             if(s === maxVal) document.getElementById('box-s').classList.add('brightest');
             if(e === maxVal) document.getElementById('box-e').classList.add('brightest');
             if(w === maxVal) document.getElementById('box-w').classList.add('brightest');
         }
 
-        // Trigger Ukur
         function triggerMeasure() {
             const btn = document.getElementById('btn-measure');
-            btn.innerHTML = "⏳ MENGUKUR...";
-            btn.disabled = true;
+            btn.innerHTML = "⏳ MENGUKUR..."; btn.disabled = true;
             db.ref('/control/measure_trigger').set(true).then(() => {
-                setTimeout(() => {
-                    btn.innerHTML = "⚡ UKUR DATA SEKARANG";
-                    btn.disabled = false;
-                }, 3000);
+                setTimeout(() => { btn.innerHTML = "⚡ UKUR DATA LISTRIK"; btn.disabled = false; }, 3000);
+            });
+        }
+
+        function triggerTestMove() {
+            const btn = document.getElementById('btn-test');
+            btn.innerHTML = "🚀 MENGIRIM PERINTAH..."; btn.disabled = true;
+            db.ref('/control/force_move').set(true).then(() => {
+                setTimeout(() => { btn.innerHTML = "▶ TES GERAK (SEKALI)"; btn.disabled = false; }, 2000);
             });
         }
     </script>
