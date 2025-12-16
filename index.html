@@ -301,7 +301,7 @@
 
         // --- VARS ---
         let lastHeartbeat = 0;
-        const OFFLINE_TIMEOUT = 5000;
+        const OFFLINE_TIMEOUT = 15000;
 
         // --- REALTIME LISTENER ---
         db.ref('/status').on('value', (snapshot) => {
@@ -386,3 +386,4 @@
     </script>
 </body>
 </html>
+
