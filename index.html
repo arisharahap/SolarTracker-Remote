@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Solar Tracker Smart Schedule</title>
+    <title>Solar Tracker GPS Hybrid</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
@@ -14,8 +14,8 @@
             --text: #f1f5f9;
             --primary: #38bdf8;
             --accent: #f472b6;
-            --ldr-box: #334155;
             --success: #34d399;
+            --warn: #fbbf24;
         }
 
         body {
@@ -29,7 +29,7 @@
         .dashboard-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
-            gap: 20px; width: 100%; max-width: 800px;
+            gap: 20px; width: 100%; max-width: 900px;
         }
 
         .card {
@@ -43,40 +43,47 @@
 
         /* --- TIMER --- */
         .timer-display {
-            font-size: 2rem; font-weight: bold; text-align: center;
-            color: var(--primary); margin: 20px 0;
-            font-family: monospace;
+            font-size: 2.5rem; font-weight: bold; text-align: center;
+            color: var(--primary); margin: 15px 0; font-family: monospace;
         }
         .timer-label { text-align: center; color: #64748b; font-size: 0.9rem; }
 
-        /* --- LDR GRID --- */
-        .ldr-grid {
-            display: grid;
-            grid-template-areas: ". north ." "west center east" ". south .";
-            gap: 10px; justify-content: center; margin-top: 20px;
+        /* --- ANGLE DISPLAY --- */
+        .angle-row {
+            display: flex; justify-content: space-between; align-items: center;
+            background: rgba(255,255,255,0.05); padding: 12px; border-radius: 8px; margin-bottom: 10px;
         }
-        .ldr-box {
-            background: var(--ldr-box);
-            width: 80px; height: 80px;
-            display: flex; flex-direction: column;
-            justify-content: center; align-items: center;
-            border-radius: 8px; border: 2px solid transparent;
+        .angle-val { font-weight: bold; font-size: 1.2rem; }
+        .angle-target { color: var(--warn); } /* Kuning untuk target Matahari */
+        .angle-current { color: var(--success); } /* Hijau untuk posisi Panel */
+
+        /* --- COMPASS SIMPLE --- */
+        .compass-container {
+            width: 100px; height: 100px; border: 2px solid #334155; border-radius: 50%;
+            margin: 20px auto; position: relative;
+            background: radial-gradient(circle, #334155 10%, transparent 10%);
         }
-        .ldr-box span { font-weight: bold; font-size: 1.2rem; }
-        .ldr-label { font-size: 0.7rem; color: #94a3b8; margin-bottom: 5px; }
-        .brightest { border-color: var(--warn); background: rgba(251, 191, 36, 0.1); box-shadow: 0 0 10px rgba(251, 191, 36, 0.2); }
+        .compass-needle {
+            width: 4px; height: 45px; background: var(--success);
+            position: absolute; top: 5px; left: 48px;
+            transform-origin: bottom center;
+            transition: transform 0.5s ease-out;
+            border-radius: 2px;
+        }
+        .compass-needle::after {
+            content: ''; position: absolute; top: -5px; left: -3px;
+            border-left: 5px solid transparent; border-right: 5px solid transparent;
+            border-bottom: 8px solid var(--success);
+        }
 
         /* --- BUTTONS --- */
         .btn-group { display: grid; gap: 10px; margin-top: 20px; }
-        
         .btn-measure {
             width: 100%; padding: 15px;
             background: linear-gradient(135deg, var(--primary), var(--accent));
             border: none; border-radius: 10px;
             color: white; font-weight: bold; cursor: pointer;
         }
-        
-        /* Tombol Test Gerak - Warna Hijau */
         .btn-test {
             width: 100%; padding: 12px;
             background: linear-gradient(135deg, #10b981, #059669);
@@ -84,7 +91,6 @@
             color: white; font-weight: bold; cursor: pointer;
             border: 1px solid #34d399;
         }
-        
         .btn-measure:disabled, .btn-test:disabled { opacity: 0.5; cursor: not-allowed; }
 
         .val-row { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 1rem; }
@@ -94,18 +100,17 @@
 </head>
 <body>
 
-    <h1>SMART SOLAR TRACKER</h1>
-    <div style="color:#64748b; margin-bottom:20px;">Sistem Interval 10 Menit (09:00 - 17:00)</div>
+    <h1>GPS SOLAR TRACKER</h1>
+    <div style="color:#64748b; margin-bottom:20px;">Sistem Interval 10 Menit (Hybrid GPS + MPU)</div>
 
     <div class="dashboard-grid">
         
         <div class="card">
             <h2>Jadwal Pergerakan</h2>
             <div class="timer-label">Status Sistem:</div>
-            
             <div id="schedule-display" class="timer-display">--:--</div>
             
-            <div style="text-align:center;">
+            <div style="text-align:center; margin-bottom:15px;">
                 Kondisi: <span id="status-text" style="font-weight:bold; color:var(--accent)">WAITING</span>
             </div>
 
@@ -117,14 +122,32 @@
         </div>
 
         <div class="card">
-            <h2>Sensor Cahaya (LDR)</h2>
-            <div class="ldr-grid">
-                <div class="ldr-box" style="grid-area: north" id="box-n"><div class="ldr-label">NORTH</div> <span id="val-n">0</span></div>
-                <div class="ldr-box" style="grid-area: west" id="box-w"><div class="ldr-label">WEST</div> <span id="val-w">0</span></div>
-                <div style="grid-area: center; display:flex; align-items:center; justify-content:center; color:#fbbf24; font-size:2rem;">☀</div>
-                <div class="ldr-box" style="grid-area: east" id="box-e"><div class="ldr-label">EAST</div> <span id="val-e">0</span></div>
-                <div class="ldr-box" style="grid-area: south" id="box-s"><div class="ldr-label">SOUTH</div> <span id="val-s">0</span></div>
+            <h2>Monitor Sudut (Tracking)</h2>
+            <div style="display:flex; justify-content:space-between; font-size:0.8rem; color:#94a3b8; margin-bottom:5px;">
+                <span>PARAMETER</span> <span>AKTUAL (HIJAU)</span>
             </div>
+
+            <div class="angle-row">
+                <div>
+                    <div style="font-size:0.85rem; color:#94a3b8">AZIMUTH (Arah)</div>
+                    <div style="font-size:0.75rem; color:var(--warn)">Target GPS: <span id="tgt-az">0</span>°</div>
+                </div>
+                <div class="angle-val angle-current" id="val-az">0°</div>
+            </div>
+
+            <div class="angle-row">
+                <div>
+                    <div style="font-size:0.85rem; color:#94a3b8">ELEVATION (Tinggi)</div>
+                    <div style="font-size:0.75rem; color:var(--warn)">Target GPS: <span id="tgt-el">0</span>°</div>
+                </div>
+                <div class="angle-val angle-current" id="val-el">0°</div>
+            </div>
+
+            <div class="compass-container">
+                <div id="compass-needle" class="compass-needle"></div>
+                <div style="position:absolute; top:-20px; left:42px; font-size:0.8rem; color:#94a3b8;">U</div>
+            </div>
+            <div style="text-align:center; font-size:0.8rem; color:#64748b;">Visualisasi Arah Panel (Utara Atas)</div>
         </div>
 
         <div class="card">
@@ -155,12 +178,26 @@
         db.ref('/status').on('value', (snapshot) => {
             const data = snapshot.val();
             if(data) {
-                // 1. Update LDR
-                const n = data.ldr_n || 0; const s = data.ldr_s || 0;
-                const e = data.ldr_e || 0; const w = data.ldr_w || 0;
-                document.getElementById('val-n').innerText = n; document.getElementById('val-s').innerText = s;
-                document.getElementById('val-e').innerText = e; document.getElementById('val-w').innerText = w;
-                highlightBrightest(n, s, e, w);
+                // 1. Update Data Sudut (Aktual dari MPU)
+                const az = (data.azimuth || 0).toFixed(0);
+                const el = (data.elevation || 0).toFixed(0);
+                
+                // Jika Anda juga mengirim Target GPS dari ESP, ambil di sini.
+                // Jika tidak, kita biarkan 0 atau sembunyikan.
+                // Asumsi: Anda akan menambahkan pengiriman 'target_az' dan 'target_el' dari ESP nanti.
+                // Untuk sekarang kita tampilkan placeholder atau data dummy.
+                const tgtAz = (data.target_az || 0).toFixed(0); 
+                const tgtEl = (data.target_el || 0).toFixed(0);
+
+                document.getElementById('val-az').innerText = az + "°";
+                document.getElementById('val-el').innerText = el + "°";
+                
+                // Update Target (Opsional, jika ESP kirim data ini)
+                // document.getElementById('tgt-az').innerText = tgtAz;
+                // document.getElementById('tgt-el').innerText = tgtEl;
+
+                // Update Jarum Kompas
+                document.getElementById('compass-needle').style.transform = `rotate(${az}deg)`;
 
                 // 2. Update Power
                 document.getElementById('val-volt').innerText = (data.voltage || 0).toFixed(2) + " V";
@@ -173,11 +210,11 @@
                 const schedEl = document.getElementById('schedule-display');
                 
                 if(isMoving) {
-                    statEl.innerText = "SEDANG MENCARI POSISI...";
+                    statEl.innerText = "MENGEJAR POSISI GPS...";
                     statEl.className = "status-moving";
-                    schedEl.innerText = "MOVING NOW";
+                    schedEl.innerText = "MOVING";
                 } else {
-                    statEl.innerText = "STANDBY / DIAM";
+                    statEl.innerText = "TERKUNCI / DIAM";
                     statEl.className = "";
                     statEl.style.color = "#f472b6";
                     
@@ -194,39 +231,26 @@
                 const targetDate = new Date(nextMoveEpoch * 1000);
                 const now = new Date();
                 
-                // Format Jam Target: HH:MM
                 const hours = targetDate.getHours().toString().padStart(2, '0');
                 const mins = targetDate.getMinutes().toString().padStart(2, '0');
                 const timeStr = `${hours}:${mins}`;
 
-                // Cek apakah tanggal target sama dengan hari ini
                 const isToday = targetDate.getDate() === now.getDate() && 
                                 targetDate.getMonth() === now.getMonth();
 
                 const displayEl = document.getElementById('schedule-display');
                 
                 if (isToday) {
-                    displayEl.innerText = `Jadwal: ${timeStr} WIB`;
-                    displayEl.style.fontSize = "2rem";
+                    displayEl.innerText = `${timeStr} WIB`;
+                    displayEl.style.fontSize = "2.5rem";
                 } else {
-                    // Jika tanggal beda, berarti "Besok"
-                    displayEl.innerText = `BESOK PAGI ${timeStr}`;
-                    displayEl.style.fontSize = "1.8rem"; // Kecilkan dikit biar muat
+                    displayEl.innerText = `BESOK ${timeStr}`;
+                    displayEl.style.fontSize = "2rem";
                 }
             }
         }
 
-        // Jalankan update setiap detik agar tetap sinkron kalau pindah hari
         setInterval(updateScheduleDisplay, 1000);
-
-        function highlightBrightest(n, s, e, w) {
-            document.querySelectorAll('.ldr-box').forEach(b => b.classList.remove('brightest'));
-            const maxVal = Math.max(n, s, e, w);
-            if(n === maxVal) document.getElementById('box-n').classList.add('brightest');
-            if(s === maxVal) document.getElementById('box-s').classList.add('brightest');
-            if(e === maxVal) document.getElementById('box-e').classList.add('brightest');
-            if(w === maxVal) document.getElementById('box-w').classList.add('brightest');
-        }
 
         function triggerMeasure() {
             const btn = document.getElementById('btn-measure');
@@ -238,7 +262,7 @@
 
         function triggerTestMove() {
             const btn = document.getElementById('btn-test');
-            btn.innerHTML = "🚀 MENGIRIM PERINTAH..."; btn.disabled = true;
+            btn.innerHTML = "🚀 MENGIRIM..."; btn.disabled = true;
             db.ref('/control/force_move').set(true).then(() => {
                 setTimeout(() => { btn.innerHTML = "▶ TES GERAK (SEKALI)"; btn.disabled = false; }, 2000);
             });
