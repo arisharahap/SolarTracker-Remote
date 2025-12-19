@@ -241,12 +241,16 @@
                 const displayEl = document.getElementById('schedule-display');
                 
                 if (isToday) {
-                    displayEl.innerText = `${timeStr} WIB`;
-                    displayEl.style.fontSize = "2.5rem";
-                } else {
-                    displayEl.innerText = `BESOK ${timeStr}`;
-                    displayEl.style.fontSize = "2rem";
-                }
+    displayEl.innerText = `${timeStr} WIB`;
+    displayEl.style.fontSize = "2.5rem";
+} else if (targetDate < now) {
+    // Jika waktu sudah lewat
+    displayEl.innerText = "MENUNGGU UPDATE...";
+    displayEl.style.fontSize = "1.5rem";
+} else {
+    displayEl.innerText = `BESOK ${timeStr}`;
+    displayEl.style.fontSize = "2rem";
+}
             }
         }
 
@@ -270,4 +274,5 @@
     </script>
 </body>
 </html>
+
 
