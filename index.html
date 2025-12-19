@@ -193,8 +193,8 @@
                 document.getElementById('val-el').innerText = el + "°";
                 
                 // Update Target (Opsional, jika ESP kirim data ini)
-                // document.getElementById('tgt-az').innerText = tgtAz;
-                // document.getElementById('tgt-el').innerText = tgtEl;
+                document.getElementById('tgt-az').innerText = tgtAz;
+                document.getElementById('tgt-el').innerText = tgtEl;
 
                 // Update Jarum Kompas
                 document.getElementById('compass-needle').style.transform = `rotate(${az}deg)`;
@@ -274,5 +274,6 @@
     </script>
 </body>
 </html>
+
 
 
